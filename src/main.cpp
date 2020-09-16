@@ -121,11 +121,11 @@ void logging(void)
       gFI[i] = 62 + a;
       //GANTI RUMUS
     }
-    tft.fillRect(20 + (10 * i), 62, 10, 63, 0x0164);
-    tft.fillRect(20 + (10 * i), gFI[i], 3, 3, 0xFFE0);
+    tft.fillRect(10 + (10 * i), 62, 10, 63, 0x0164);
+    tft.fillRect(10 + (10 * i), gFI[i], 3, 3, 0xFFE0);
     if (i != 1)
     {
-      tft.drawLine(20 + (10 * i), gFI[i], 20 + (10 * (i - 1)), gFI[(i - 1)], 0xF800);
+      tft.drawLine(10 + (10 * i), gFI[i], 10 + (10 * (i - 1)), gFI[(i - 1)], 0xF800);
     }
   }
 
@@ -165,11 +165,11 @@ for (int i = 13; i > 1; i--)
       gFO[i] = 62 + a;
       //GANTI RUMUS
     }
-    tft.fillRect(180 + (10 * i), 62, 10, 63, 0x002E);
-    tft.fillRect(180 + (10 * i), gFO[i], 3, 3, 0xF800);
+    tft.fillRect(170 + (10 * i), 62, 10, 63, 0x002E);
+    tft.fillRect(170 + (10 * i), gFO[i], 3, 3, 0xF800);
     if (i != 1)
     {
-      tft.drawLine(180 + (10 * i), gFO[i], 5 + (180 * (i - 1)), gFO[(i - 1)], 0xFFE0);
+      tft.drawLine(170 + (10 * i), gFO[i], 170 + (10 * (i - 1)), gFO[(i - 1)], 0xFFE0);
     }
   }
 
@@ -350,7 +350,14 @@ void loop()
   tft.print(':');
   tft.print(now.minute(), DEC);
   tft.print(':');
-  tft.print(now.second(), DEC);
+  if (now.second(), DEC <10)
+  {
+    tft.print("0");
+    tft.print(now.second(), DEC);
+  } else
+  {
+    tft.print(now.second(), DEC);
+  }
   tft.println();
 
   unsigned long currentMillis = millis();
@@ -513,17 +520,10 @@ uint8_t showBMP(char *nm, int x, int y)
       }
     }
 
-    // Set TFT address window to clipped image bounds
     tft.setAddrWindow(x, y, x + w - 1, y + h - 1);
     for (row = 0; row < h; row++)
-    { // For each scanline...
-      // Seek to start of scan line.  It might seem labor-
-      // intensive to be doing this on every line, but this
-      // method covers a lot of gritty details like cropping
-      // and scanline padding.  Also, the seek only takes
-      // place if the file position actually needs to change
-      // (avoids a lot of cluster math in SD library).
-      uint8_t r, g, b, *sdptr;
+    { 
+      uint8_t r, g, b;
       int lcdidx, lcdleft;
       if (flip) // Bitmap is stored bottom-to-top order (normal BMP)
         pos = bmpImageoffset + (bmpHeight - 1 - row) * rowSize;
