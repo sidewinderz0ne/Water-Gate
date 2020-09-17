@@ -1,17 +1,21 @@
 #include <Arduino.h>
 #include <Wire.h>
+#include <Filter.h>
+
+ExponentialFilter<float> H1(20, 0);
+ExponentialFilter<float> H2(20, 0);
 
 #include <RTClib.h>
 RTC_DS3231 rtc;
 
-const long alarmTime = 1000; //Mili detik
+const long alarmTime = 5000; //Mili detik
 int buzzerDuration = 1000;   //Mili Detik
 int buzzerSound = 4000;      //KHz
 long alarm;
 int mill;
 int onTime;
 
-int jarakSensorKeTanah = 200;
+int jarakSensorKeTanah = 240;
 int gateClosed = 200;
 int gateOpened = 50;
 int nilaiMaxGrafik = 200;
@@ -83,7 +87,8 @@ void logging(void)
   Serial.println("loop if jalan");
   alarm = alarm + alarmTime;
 
-  long duration1, distance1, duration2, distance2, duration3, distance3;
+  long duration3, distance3;
+  long duration1, distance1, duration2, distance2;
   digitalWrite(trigPin1, LOW);
   delayMicroseconds(2);
   digitalWrite(trigPin1, HIGH);
@@ -91,11 +96,12 @@ void logging(void)
   digitalWrite(trigPin1, LOW);
   duration1 = pulseIn(echoPin1, HIGH);
   distance1 = jarakSensorKeTanah - ((duration1 / 2) / 29.1);
-  tft.fillRect(0, 125, 160, 45, 0x0164);
+  tft.fillRect(0, 129, 160, 41, 0x0164);
   tft.setFont(&FreeSansBold24pt7b);
   tft.setCursor(10, 166);
   tft.print(distance1);
   tft.print("cm");
+  H1.Filter(distance1);
 
   for (int i = 13; i > 1; i--)
   {
@@ -103,7 +109,7 @@ void logging(void)
   }
 
   /* gIn[1] = rand() % 200 + 1; */
-  gIn[1] = distance1;
+  gIn[1] = H1.Current();
 
   for (int i = 1; i < 14; i++)
   {
@@ -121,7 +127,7 @@ void logging(void)
       gFI[i] = 62 + a;
       //GANTI RUMUS
     }
-    tft.fillRect(10 + (10 * i), 62, 10, 63, 0x0164);
+    tft.fillRect(10 + (10 * i), 62, 10, 68, 0x0164);
     tft.fillRect(10 + (10 * i), gFI[i], 3, 3, 0xFFE0);
     if (i != 1)
     {
@@ -136,10 +142,11 @@ void logging(void)
   digitalWrite(trigPin2, LOW);
   duration2 = pulseIn(echoPin2, HIGH);
   distance2 = jarakSensorKeTanah - ((duration2 / 2) / 29.1);
-  tft.fillRect(160, 125, 320, 45, 0x002E);
+  tft.fillRect(160, 129, 320, 41, 0x002E);
   tft.setCursor(170, 166);
   tft.print(distance2);
   tft.print("cm");
+  H2.Filter(distance2);
 
 for (int i = 13; i > 1; i--)
   {
@@ -147,7 +154,7 @@ for (int i = 13; i > 1; i--)
   }
 
   /* gOu[1] = rand() % 200 + 1; */
-  gOu[1] = distance2;
+  gOu[1] = H2.Current();
 
   for (int i = 1; i < 14; i++)
   {
@@ -165,14 +172,13 @@ for (int i = 13; i > 1; i--)
       gFO[i] = 62 + a;
       //GANTI RUMUS
     }
-    tft.fillRect(170 + (10 * i), 62, 10, 63, 0x002E);
-    tft.fillRect(170 + (10 * i), gFO[i], 3, 3, 0xF800);
+    tft.fillRect(170 + (10 * i), 62, 10, 68, 0x002E);
+    tft.fillRect(170 + (10 * i), gFO[i], 3, 3, 0x07E0);
     if (i != 1)
     {
       tft.drawLine(170 + (10 * i), gFO[i], 170 + (10 * (i - 1)), gFO[(i - 1)], 0xFFE0);
     }
   }
-
 
   digitalWrite(trigPin3, LOW);
   delayMicroseconds(2);
@@ -194,7 +200,7 @@ for (int i = 13; i > 1; i--)
     digitalWrite(relayDn, LOW);
   }
 
-  tft.fillRect(190, 205, 220, 50, 0x0000);
+  tft.fillRect(205, 205, 220, 50, 0x0000);
   if (distance3 >= gateClosed)
   {
     tft.setCursor(210, 226);
@@ -225,9 +231,9 @@ for (int i = 13; i > 1; i--)
     f.print(":");
     f.print(rtc.now().second(), DEC);
     f.print(",");
-    f.print(distance1);
+    f.print(H1.Current());
     f.print(",");
-    f.print(distance2);
+    f.print(H2.Current());
     f.print(",");
     f.print(distance3);
     f.print(",");
@@ -331,9 +337,38 @@ void setup()
 
 void loop()
 {
+
+  long duration1, distance1, duration2, distance2;
+  digitalWrite(trigPin1, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPin1, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin1, LOW);
+  duration1 = pulseIn(echoPin1, HIGH);
+  distance1 = jarakSensorKeTanah - ((duration1 / 2) / 29.1);
+  tft.fillRect(0, 129, 160, 41, 0x0164);
+  tft.setFont(&FreeSansBold24pt7b);
+  tft.setCursor(10, 166);
+  tft.print(distance1);
+  tft.print("cm");
+  H1.Filter(distance1);
+
+  digitalWrite(trigPin2, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPin2, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin2, LOW);
+  duration2 = pulseIn(echoPin2, HIGH);
+  distance2 = jarakSensorKeTanah - ((duration2 / 2) / 29.1);
+  tft.fillRect(160, 129, 320, 41, 0x002E);
+  tft.setCursor(170, 166);
+  tft.print(distance2);
+  tft.print("cm");
+  H2.Filter(distance2);
+
   DateTime now = rtc.now();
 
-  tft.fillRect(125, 186, 220, 25, 0x0000);
+  tft.fillRect(140, 186, 220, 25, 0x0000);
   tft.setCursor(125, 226);
   tft.setFont(&FreeSans9pt7b);
   tft.print("Gate Pos:");
@@ -344,7 +379,7 @@ void loop()
   tft.print(now.month(), DEC);
   tft.print('/');
   tft.print(now.day(), DEC);
-  tft.print(" ");
+  tft.print(" - ");
 
   tft.print(now.hour(), DEC);
   tft.print(':');
