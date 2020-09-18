@@ -20,14 +20,7 @@ int gateClosed = 200;
 int gateOpened = 50;
 int nilaiMaxGrafik = 200;
 
-int buzzer = 31;
-
-void buzz(void)
-{
-  tone(buzzer, buzzerSound);
-  delay(buzzerDuration);
-  noTone(buzzer);
-}
+int buzzer = 30;
 
 extern const uint8_t srs[];
 
@@ -77,6 +70,15 @@ int pathlen;
 byte Second;
 uint8_t showBMP(char *nm, int x, int y);
 void printLogo();
+void buzz();
+void logging();
+
+void buzz()
+{
+  tone(buzzer, buzzerSound);
+  delay(buzzerDuration);
+  noTone(buzzer);
+}
 
 char daysOfTheWeek[7][12] = {"Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"};
 
@@ -86,7 +88,6 @@ void logging(void)
 {
   Serial.println("loop if jalan");
   alarm = alarm + alarmTime;
-
   long duration3, distance3;
   long duration1, distance1, duration2, distance2;
   digitalWrite(trigPin1, LOW);
@@ -123,7 +124,7 @@ void logging(void)
     }
     else
     {
-      int a = 60 * (gIn[i] - nilaiMaxGrafik) / (nilaiMaxGrafik*-1);
+      int a = 60 * (gIn[i] - nilaiMaxGrafik) / (nilaiMaxGrafik * -1);
       gFI[i] = 62 + a;
       //GANTI RUMUS
     }
@@ -148,7 +149,7 @@ void logging(void)
   tft.print("cm");
   H2.Filter(distance2);
 
-for (int i = 13; i > 1; i--)
+  for (int i = 13; i > 1; i--)
   {
     gOu[i] = gOu[i - 1];
   }
@@ -168,7 +169,7 @@ for (int i = 13; i > 1; i--)
     }
     else
     {
-      int a = 60 * (gOu[i] - nilaiMaxGrafik) / (nilaiMaxGrafik*-1);
+      int a = 60 * (gOu[i] - nilaiMaxGrafik) / (nilaiMaxGrafik * -1);
       gFO[i] = 62 + a;
       //GANTI RUMUS
     }
@@ -239,20 +240,20 @@ for (int i = 13; i > 1; i--)
     f.print(",");
     f.println();
     f.close(); // close the file
+    buzz();
     Serial.println("sd tulis berhasil");
   }
-  // if the file didn't open, print an error:
   else
   {
   }
-  buzz();
 }
 
 void setup()
 {
-
   uint16_t ID;
   Serial.begin(9600);
+  pinMode(buzzer, OUTPUT);
+  buzz();
   alarm = alarmTime;
   if (!rtc.begin())
   {
@@ -260,7 +261,6 @@ void setup()
     Serial.flush();
     abort();
   }
-
   if (rtc.lostPower())
   {
     Serial.println("RTC lost power, let's set the time!");
@@ -385,11 +385,12 @@ void loop()
   tft.print(':');
   tft.print(now.minute(), DEC);
   tft.print(':');
-  if (now.second(), DEC <10)
+  if (now.second(), DEC < 10)
   {
     tft.print("0");
     tft.print(now.second(), DEC);
-  } else
+  }
+  else
   {
     tft.print(now.second(), DEC);
   }
@@ -557,7 +558,7 @@ uint8_t showBMP(char *nm, int x, int y)
 
     tft.setAddrWindow(x, y, x + w - 1, y + h - 1);
     for (row = 0; row < h; row++)
-    { 
+    {
       uint8_t r, g, b;
       int lcdidx, lcdleft;
       if (flip) // Bitmap is stored bottom-to-top order (normal BMP)
