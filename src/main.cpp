@@ -1,95 +1,109 @@
 #include <Arduino.h>
-#include <Wire.h>
-#include <Filter.h>
 
-ExponentialFilter<float> H1(20, 0);
-ExponentialFilter<float> H2(20, 0);
-
-#include <RTClib.h>
-RTC_DS3231 rtc;
-
-const long alarmTime = 5000; //Mili detik
-int buzzerDuration = 1000;   //Mili Detik
-int buzzerSound = 4000;      //KHz
+//--------------SETTINGAN ALAT
+//--------------------------------------------------
+//SETTING WAKTU
+const long alarmTime = 10000; //Setting waktu logging
+int buzzerDuration = 1001;   //Mili Detik
+int buzzerSound = 2345;      //KHz
 long alarm;
-int mill;
-int onTime;
-
+//--------------------------------------------------
+//SETTING SENSOR
 int jarakSensorKeTanah = 240;
 int gateClosed = 200;
 int gateOpened = 50;
 int nilaiMaxGrafik = 200;
-
-int buzzer = 30;
-
-extern const uint8_t srs[];
-
+//--------------------------------------------------
+//SETTING PIN
+#define buzzer 30
 //sensor air 1
 #define trigPin1 22
 #define echoPin1 23
-
 //sensor air 2
 #define trigPin2 24
 #define echoPin2 25
-
 //sensor pintu
 #define trigPin3 26
 #define echoPin3 27
-
 //relay kontrol pintu
 #define relayUp 28
 #define relayDn 29
+//--------------------------------------------------
+
+#include <Wire.h>
+
+#include <Filter.h>
+ExponentialFilter<float> H1(20, 0), H2(20, 0);
+int gIn[13] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+int gOu[13] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+int gFI[13] = {62, 62, 62, 62, 62, 62, 62, 62, 62, 62, 62, 62, 62};
+int gFO[13] = {62, 62, 62, 62, 62, 62, 62, 62, 62, 62, 62, 62, 62};
+
+#include <RTClib.h>
+RTC_DS3231 rtc;
+char daysOfTheWeek[7][12] = {"Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"};
 
 #include <SPI.h> // f.k. for Arduino-1.5.2
 #define USE_SDFAT
-#include <SdFat.h>           // Use the SdFat library
+#include <SdFat.h> // Use the SdFat library
 SdFatSoftSpi<12, 11, 13> SD; //Bit-Bang on the Shield pins
-
+#define SD_CS 10
 #include <Adafruit_GFX.h> // Hardware-specific library
 #include <MCUFRIEND_kbv.h>
 MCUFRIEND_kbv tft;
-
-#define SD_CS 10
+/* some RGB color definitions                                                 */
+#define Black 0x0000       /*   0,   0,   0 */
+#define Navy 0x000F        /*   0,   0, 128 */
+#define DarkGreen 0x03E0   /*   0, 128,   0 */
+#define DarkCyan 0x03EF    /*   0, 128, 128 */
+#define Maroon 0x7800      /* 128,   0,   0 */
+#define Purple 0x780F      /* 128,   0, 128 */
+#define Olive 0x7BE0       /* 128, 128,   0 */
+#define LightGrey 0xC618   /* 192, 192, 192 */
+#define DarkGrey 0x7BEF    /* 128, 128, 128 */
+#define Blue 0x001F        /*   0,   0, 255 */
+#define Green 0x07E0       /*   0, 255,   0 */
+#define Cyan 0x07FF        /*   0, 255, 255 */
+#define Red 0xF800         /* 255,   0,   0 */
+#define Magenta 0xF81F     /* 255,   0, 255 */
+#define Yellow 0xFFE0      /* 255, 255,   0 */
+#define White 0xFFFF       /* 255, 255, 255 */
+#define Orange 0xFD20      /* 255, 165,   0 */
+#define GreenYellow 0xAFE5 /* 173, 255,  47 */
+#define WarnaBgGrfKanan 0x002E /* 173, 255,  47 */
+#define WarnaBgGrfKiri 0x0164 /* 173, 255,  47 */
+#define Pink 0xF81F
 //#define NAMEMATCH ""         // "" matches any name
 #define NAMEMATCH "logo_srs" // *tiger*.bmp
 #define PALETTEDEPTH 8       // support 256-colour Palette
 #include <Fonts/FreeSansBold24pt7b.h>
 #include <Fonts/FreeSans12pt7b.h>
 #include <Fonts/FreeSans9pt7b.h>
-
-int gIn[13] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-int gOu[13] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-int gFI[13] = {62, 62, 62, 62, 62, 62, 62, 62, 62, 62, 62, 62, 62};
-int gFO[13] = {62, 62, 62, 62, 62, 62, 62, 62, 62, 62, 62, 62, 62};
 //char namebuf[32] = "/";   //BMP files in root directory
 char namebuf[32] = "/Bitmap/"; //BMP directory e.g. files in /bitmaps/*.bmp
-
 File root;
 int pathlen;
+File f;
 
-byte Second;
+//Function
+//------------------------------------------------------------------
 uint8_t showBMP(char *nm, int x, int y);
-void printLogo();
-void buzz();
 void logging();
+//-----------------------------------------------------------------
 
-void buzz()
+void buuuzzz(void)
 {
   tone(buzzer, buzzerSound);
   delay(buzzerDuration);
   noTone(buzzer);
 }
 
-char daysOfTheWeek[7][12] = {"Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"};
-
-File f;
-
 void logging(void)
 {
-  Serial.println("loop if jalan");
-  alarm = alarm + alarmTime;
-  long duration3, distance3;
-  long duration1, distance1, duration2, distance2;
+  alarm = alarm + alarmTime;                       //KALIBERASI WAKTU
+  long duration3, distance3;                       //VARIABLE SENSOR PINTU WATER GATE
+  long duration1, distance1, duration2, distance2; //VIARABEL SENSOR AIR
+
   digitalWrite(trigPin1, LOW);
   delayMicroseconds(2);
   digitalWrite(trigPin1, HIGH);
@@ -97,22 +111,21 @@ void logging(void)
   digitalWrite(trigPin1, LOW);
   duration1 = pulseIn(echoPin1, HIGH);
   distance1 = jarakSensorKeTanah - ((duration1 / 2) / 29.1);
-  tft.fillRect(0, 129, 160, 41, 0x0164);
+  tft.fillRect(0, 129, 160, 41, WarnaBgGrfKiri);
   tft.setFont(&FreeSansBold24pt7b);
   tft.setCursor(10, 166);
   tft.print(distance1);
   tft.print("cm");
   H1.Filter(distance1);
 
-  for (int i = 13; i > 1; i--)
+  for (int i = 13; i > 1; i--) //LOOP NGOPY NILAI SEBELUMNYA
   {
     gIn[i] = gIn[i - 1];
   }
-
   /* gIn[1] = rand() % 200 + 1; */
-  gIn[1] = H1.Current();
+  gIn[1] = H1.Current(); //MASUKAN HAIL FILTER NILAI PERTAMA
 
-  for (int i = 1; i < 14; i++)
+  for (int i = 1; i < 14; i++) //BIKIN GRAFIK
   {
     if (gIn[i] >= nilaiMaxGrafik)
     {
@@ -128,11 +141,11 @@ void logging(void)
       gFI[i] = 62 + a;
       //GANTI RUMUS
     }
-    tft.fillRect(10 + (10 * i), 62, 10, 68, 0x0164);
-    tft.fillRect(10 + (10 * i), gFI[i], 3, 3, 0xFFE0);
+    tft.fillRect(10 + (10 * i), 62, 10, 68, WarnaBgGrfKiri);
+    tft.fillRect(10 + (10 * i), gFI[i], 3, 3, Yellow);
     if (i != 1)
     {
-      tft.drawLine(10 + (10 * i), gFI[i], 10 + (10 * (i - 1)), gFI[(i - 1)], 0xF800);
+      tft.drawLine(10 + (10 * i), gFI[i], 10 + (10 * (i - 1)), gFI[(i - 1)], Green);
     }
   }
 
@@ -143,21 +156,21 @@ void logging(void)
   digitalWrite(trigPin2, LOW);
   duration2 = pulseIn(echoPin2, HIGH);
   distance2 = jarakSensorKeTanah - ((duration2 / 2) / 29.1);
-  tft.fillRect(160, 129, 320, 41, 0x002E);
+  tft.fillRect(160, 129, 320, 41, WarnaBgGrfKanan);
   tft.setCursor(170, 166);
   tft.print(distance2);
   tft.print("cm");
   H2.Filter(distance2);
 
-  for (int i = 13; i > 1; i--)
+  for (int i = 13; i > 1; i--) //LOOP NGOPY NILAI SEBELUMNYA
   {
     gOu[i] = gOu[i - 1];
   }
 
   /* gOu[1] = rand() % 200 + 1; */
-  gOu[1] = H2.Current();
+  gOu[1] = H2.Current(); //MASUKAN HAIL FILTER NILAI PERTAMA
 
-  for (int i = 1; i < 14; i++)
+  for (int i = 1; i < 14; i++) //BIKIN GRAFIK
   {
     if (gOu[i] >= nilaiMaxGrafik)
     {
@@ -173,11 +186,11 @@ void logging(void)
       gFO[i] = 62 + a;
       //GANTI RUMUS
     }
-    tft.fillRect(170 + (10 * i), 62, 10, 68, 0x002E);
-    tft.fillRect(170 + (10 * i), gFO[i], 3, 3, 0x07E0);
+    tft.fillRect(170 + (10 * i), 62, 10, 68, WarnaBgGrfKanan);
+    tft.fillRect(170 + (10 * i), gFO[i], 3, 3, Green);
     if (i != 1)
     {
-      tft.drawLine(170 + (10 * i), gFO[i], 170 + (10 * (i - 1)), gFO[(i - 1)], 0xFFE0);
+      tft.drawLine(170 + (10 * i), gFO[i], 170 + (10 * (i - 1)), gFO[(i - 1)], Yellow);
     }
   }
 
@@ -189,8 +202,7 @@ void logging(void)
   duration3 = pulseIn(echoPin3, HIGH);
   distance3 = (duration3 / 3) / 29.1;
 
-  tft.setFont(&FreeSans9pt7b);
-  if (distance1 > distance2)
+  if (distance1 > distance2) //ATUR PINTU AIR DENGAN 2 RELAY
   {
     digitalWrite(relayUp, LOW);
     digitalWrite(relayDn, HIGH);
@@ -201,7 +213,9 @@ void logging(void)
     digitalWrite(relayDn, LOW);
   }
 
-  tft.fillRect(205, 205, 220, 50, 0x0000);
+  //PRINT STATUS PINTU KE LCD
+  tft.fillRect(205, 205, 220, 50, Black);
+  tft.setFont(&FreeSans9pt7b);
   if (distance3 >= gateClosed)
   {
     tft.setCursor(210, 226);
@@ -217,6 +231,8 @@ void logging(void)
     tft.setCursor(210, 226);
     tft.print("Opened");
   }
+
+  //SIMPAN KE MICRO SD CARD
   f = SD.open("hasil.txt", FILE_WRITE);
   if (f)
   {
@@ -240,11 +256,14 @@ void logging(void)
     f.print(",");
     f.println();
     f.close(); // close the file
-    buzz();
+    buuuzzz();    //BUZZ KALO OKE
     Serial.println("sd tulis berhasil");
+    tft.fillRect(0, 0, 20, 20, Green);
   }
   else
   {
+    //KALO ERROR
+    tft.fillRect(0, 0, 20, 20, Red);
   }
 }
 
@@ -252,9 +271,14 @@ void setup()
 {
   uint16_t ID;
   Serial.begin(9600);
+
+  //SETTING AWAL BUZZER
   pinMode(buzzer, OUTPUT);
-  buzz();
-  alarm = alarmTime;
+  buuuzzz(); //TES BUZZER
+
+  alarm = alarmTime; //SETTING ALARM KE NILAI AWAL
+
+  //SETTING AWAL RTC
   if (!rtc.begin())
   {
     Serial.println("Couldn't find RTC");
@@ -264,14 +288,10 @@ void setup()
   if (rtc.lostPower())
   {
     Serial.println("RTC lost power, let's set the time!");
-    // When time needs to be set on a new device, or after a power loss, the
-    // following line sets the RTC to the date & time this sketch was compiled
     rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
-    // This line sets the RTC with an explicit date & time, for example to set
-    // January 21, 2014 at 3am you would call:
-    // rtc.adjust(DateTime(2014, 1, 21, 3, 0, 0));
   }
 
+  //SET INPUT OUTPUT PIN
   pinMode(trigPin1, OUTPUT);
   pinMode(echoPin1, INPUT);
   pinMode(trigPin2, OUTPUT);
@@ -281,15 +301,16 @@ void setup()
   pinMode(relayUp, OUTPUT);
   pinMode(relayDn, OUTPUT);
 
+  //SETTING AWAL LCD
   Serial.print("Show BMP files on TFT with ID:0x");
   ID = tft.readID();
   Serial.println(ID, HEX);
   if (ID == 0x0D3D3)
     ID = 0x9481;
   tft.begin(ID);
-  tft.fillScreen(0x001F);
-  tft.setTextColor(0xFFFF, 0x0000);
   tft.setRotation(1);
+
+  //SETTING AWAL SD CARD
   bool good = SD.begin(SD_CS);
   if (!good)
   {
@@ -303,16 +324,12 @@ void setup()
   }
   root = SD.open(namebuf);
   pathlen = strlen(namebuf);
-  printLogo();
-  tft.setCursor(0, 0);
-  tft.setTextColor(0xFFFF);
-  tft.print("www.github.com/sidewinderz0ne");
-  tft.fillRect(0, 0, 320, 240, 0x0000);
+  tft.fillRect(0, 0, 320, 240, Black);
   char name[32] = "/Bitmap/logo1.bmp";
   showBMP(name, 10, 174);
 
-  tft.fillRect(0, 25, 160, 150, 0x0164);
-  tft.fillRect(160, 25, 320, 150, 0x002E);
+  tft.fillRect(0, 25, 160, 150, WarnaBgGrfKiri);
+  tft.fillRect(160, 25, 320, 150, WarnaBgGrfKanan);
 
   tft.setCursor(38, 15);
   tft.setFont(&FreeSans12pt7b);
@@ -329,15 +346,16 @@ void setup()
   Serial.println("LCD OK");
 
   //base graph
-  tft.fillRect(15, 62, 130, 63, 0x0164);
-  tft.fillRect(175, 62, 130, 63, 0x002E);
-
-  logging();
+  tft.fillRect(15, 62, 130, 63, WarnaBgGrfKiri);
+  tft.fillRect(175, 62, 130, 63, WarnaBgGrfKanan);
+  logging(); //LOGGING AWAL SETUP
 }
 
 void loop()
 {
+  Serial.println(" . ");
 
+  //NGUKUR UNTUK MASUKIN KE FILTER DAN CETAK LCD PER DETIK
   long duration1, distance1, duration2, distance2;
   digitalWrite(trigPin1, LOW);
   delayMicroseconds(2);
@@ -352,7 +370,6 @@ void loop()
   tft.print(distance1);
   tft.print("cm");
   H1.Filter(distance1);
-
   digitalWrite(trigPin2, LOW);
   delayMicroseconds(2);
   digitalWrite(trigPin2, HIGH);
@@ -365,22 +382,21 @@ void loop()
   tft.print(distance2);
   tft.print("cm");
   H2.Filter(distance2);
+  //-----------------------------------------------------------------
 
+  //PRINT WAKTU PER DETIK
   DateTime now = rtc.now();
-
   tft.fillRect(140, 186, 220, 25, 0x0000);
   tft.setCursor(125, 226);
   tft.setFont(&FreeSans9pt7b);
   tft.print("Gate Pos:");
   tft.setCursor(125, 202);
-  Serial.println("Waiting RTC");
   tft.print(now.year(), DEC);
   tft.print('/');
   tft.print(now.month(), DEC);
   tft.print('/');
   tft.print(now.day(), DEC);
   tft.print(" - ");
-
   tft.print(now.hour(), DEC);
   tft.print(':');
   tft.print(now.minute(), DEC);
@@ -394,68 +410,17 @@ void loop()
   {
     tft.print(now.second(), DEC);
   }
-  tft.println();
+  //----------------------------------------------------------------
 
+  //KALAU ALARM TRIGGER FUNGSINYA LOGGING
   unsigned long currentMillis = millis();
   if (currentMillis >= alarm)
   {
     logging();
   }
-  delay(900);
-}
+  //----------------------------------------------------------------
 
-void printLogo()
-{
-  char *nm = namebuf + pathlen;
-  f = root.openNextFile();
-  uint8_t ret;
-  uint32_t start;
-  if (f != NULL)
-  {
-#ifdef USE_SDFAT
-    f.getName(nm, 32 - pathlen);
-#else
-    strcpy(nm, (char *)f.name());
-#endif
-    f.close();
-    strlwr(nm);
-    if (strstr(nm, ".bmp") != NULL && strstr(nm, NAMEMATCH) != NULL)
-    {
-      Serial.print(namebuf);
-      Serial.print(F(" - "));
-      tft.fillScreen(0);
-      start = millis();
-      ret = showBMP(namebuf, 5, 5);
-      switch (ret)
-      {
-      case 0:
-        Serial.print(millis() - start);
-        Serial.println(F("ms"));
-        delay(5000);
-        break;
-      case 1:
-        Serial.println(F("bad position"));
-        break;
-      case 2:
-        Serial.println(F("bad BMP ID"));
-        break;
-      case 3:
-        Serial.println(F("wrong number of planes"));
-        break;
-      case 4:
-        Serial.println(F("unsupported BMP format"));
-        break;
-      case 5:
-        Serial.println(F("unsupported palette"));
-        break;
-      default:
-        Serial.println(F("unknown"));
-        break;
-      }
-    }
-  }
-  else
-    root.rewindDirectory();
+  delay(900); //DELAY PRINT LCD
 }
 
 #define BMPIMAGEOFFSET 54
@@ -464,7 +429,6 @@ void printLogo()
 
 uint16_t read16(File &f)
 {
-  Serial.println("16 Bit BMP");
   uint16_t result; // read little-endian
   f.read(&result, sizeof(result));
   return result;
@@ -472,7 +436,6 @@ uint16_t read16(File &f)
 
 uint32_t read32(File &f)
 {
-  Serial.println("32 Bit BMP");
   uint32_t result;
   f.read(&result, sizeof(result));
   return result;
