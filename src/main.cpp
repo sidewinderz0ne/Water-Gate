@@ -89,6 +89,8 @@ File f;
 //------------------------------------------------------------------
 uint8_t showBMP(char *nm, int x, int y);
 void logging();
+uint32_t read32(File &f);
+uint16_t read16(File &f);
 //-----------------------------------------------------------------
 
 void buuuzzz(void)
@@ -168,7 +170,7 @@ void logging(void)
   }
 
   /* gOu[1] = rand() % 200 + 1; */
-  gOu[1] = H2.Current(); //MASUKAN HAIL FILTER NILAI PERTAMA
+  gOu[1] = H2.Current(); //MASUKAN HASIL FILTER NILAI PERTAMA
 
   for (int i = 1; i < 14; i++) //BIKIN GRAFIK
   {
