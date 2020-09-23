@@ -4,8 +4,8 @@
 //--------------------------------------------------
 //SETTING WAKTU
 const long alarmTime = 10000; //Setting waktu logging
-int buzzerDuration = 1001;   //Mili Detik
-int buzzerSound = 2345;      //KHz
+int buzzerDuration = 1001;    //Mili Detik
+int buzzerSound = 2345;       //KHz
 long alarm;
 //--------------------------------------------------
 //SETTING SENSOR
@@ -13,6 +13,9 @@ int jarakSensorKeTanah = 240;
 int gateClosed = 200;
 int gateOpened = 50;
 int nilaiMaxGrafik = 200;
+int maxAir = -40;
+int minAir = -60;
+int filterVal = 20;
 //--------------------------------------------------
 //SETTING PIN
 #define buzzer 30
@@ -33,7 +36,7 @@ int nilaiMaxGrafik = 200;
 #include <Wire.h>
 
 #include <Filter.h>
-ExponentialFilter<float> H1(20, 0), H2(20, 0);
+ExponentialFilter<float> H1(filterVal, 0), H2(filterVal, 0);
 int gIn[13] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 int gOu[13] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 int gFI[13] = {62, 62, 62, 62, 62, 62, 62, 62, 62, 62, 62, 62, 62};
@@ -45,33 +48,33 @@ char daysOfTheWeek[7][12] = {"Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Juma
 
 #include <SPI.h> // f.k. for Arduino-1.5.2
 #define USE_SDFAT
-#include <SdFat.h> // Use the SdFat library
+#include <SdFat.h>           // Use the SdFat library
 SdFatSoftSpi<12, 11, 13> SD; //Bit-Bang on the Shield pins
 #define SD_CS 10
 #include <Adafruit_GFX.h> // Hardware-specific library
 #include <MCUFRIEND_kbv.h>
 MCUFRIEND_kbv tft;
 /* some RGB color definitions                                                 */
-#define Black 0x0000       /*   0,   0,   0 */
-#define Navy 0x000F        /*   0,   0, 128 */
-#define DarkGreen 0x03E0   /*   0, 128,   0 */
-#define DarkCyan 0x03EF    /*   0, 128, 128 */
-#define Maroon 0x7800      /* 128,   0,   0 */
-#define Purple 0x780F      /* 128,   0, 128 */
-#define Olive 0x7BE0       /* 128, 128,   0 */
-#define LightGrey 0xC618   /* 192, 192, 192 */
-#define DarkGrey 0x7BEF    /* 128, 128, 128 */
-#define Blue 0x001F        /*   0,   0, 255 */
-#define Green 0x07E0       /*   0, 255,   0 */
-#define Cyan 0x07FF        /*   0, 255, 255 */
-#define Red 0xF800         /* 255,   0,   0 */
-#define Magenta 0xF81F     /* 255,   0, 255 */
-#define Yellow 0xFFE0      /* 255, 255,   0 */
-#define White 0xFFFF       /* 255, 255, 255 */
-#define Orange 0xFD20      /* 255, 165,   0 */
-#define GreenYellow 0xAFE5 /* 173, 255,  47 */
+#define Black 0x0000           /*   0,   0,   0 */
+#define Navy 0x000F            /*   0,   0, 128 */
+#define DarkGreen 0x03E0       /*   0, 128,   0 */
+#define DarkCyan 0x03EF        /*   0, 128, 128 */
+#define Maroon 0x7800          /* 128,   0,   0 */
+#define Purple 0x780F          /* 128,   0, 128 */
+#define Olive 0x7BE0           /* 128, 128,   0 */
+#define LightGrey 0xC618       /* 192, 192, 192 */
+#define DarkGrey 0x7BEF        /* 128, 128, 128 */
+#define Blue 0x001F            /*   0,   0, 255 */
+#define Green 0x07E0           /*   0, 255,   0 */
+#define Cyan 0x07FF            /*   0, 255, 255 */
+#define Red 0xF800             /* 255,   0,   0 */
+#define Magenta 0xF81F         /* 255,   0, 255 */
+#define Yellow 0xFFE0          /* 255, 255,   0 */
+#define White 0xFFFF           /* 255, 255, 255 */
+#define Orange 0xFD20          /* 255, 165,   0 */
+#define GreenYellow 0xAFE5     /* 173, 255,  47 */
 #define WarnaBgGrfKanan 0x002E /* 173, 255,  47 */
-#define WarnaBgGrfKiri 0x0164 /* 173, 255,  47 */
+#define WarnaBgGrfKiri 0x0164  /* 173, 255,  47 */
 #define Pink 0xF81F
 //#define NAMEMATCH ""         // "" matches any name
 #define NAMEMATCH "logo_srs" // *tiger*.bmp
@@ -91,42 +94,48 @@ uint8_t showBMP(char *nm, int x, int y);
 void logging();
 uint32_t read32(File &f);
 uint16_t read16(File &f);
+void buuuzzz();
+void buka();
+void tutup();
+void measure();
+void drawGraph(int (&graphVal)[13], int (&graphDisplay)[13], int graphY, ExponentialFilter<float> H, uint16_t warnaBackground, uint16_t warnaGrafik, uint16_t warnaTitik);
 //-----------------------------------------------------------------
 
-void buuuzzz(void)
+//FUNGSI BUZZER
+void buuuzzz()
 {
   tone(buzzer, buzzerSound);
   delay(buzzerDuration);
   noTone(buzzer);
 }
 
+//FUNGSI BUKA PINTU
+void buka()
+{
+  digitalWrite(relayUp, HIGH);
+  digitalWrite(relayDn, LOW);
+}
+
+//FUNGSI TUTUP PINTU
+void tutup()
+{
+  digitalWrite(relayUp, LOW);
+  digitalWrite(relayDn, HIGH);
+}
+
+//FUNGSI LOGGING DATA
 void logging(void)
 {
-  alarm = alarm + alarmTime;                       //KALIBERASI WAKTU
-  long duration3, distance3;                       //VARIABLE SENSOR PINTU WATER GATE
-  long duration1, distance1, duration2, distance2; //VIARABEL SENSOR AIR
+  alarm = alarm + alarmTime; //KALIBERASI WAKTU
+  long duration3, distance3; //VARIABLE SENSOR PINTU WATER GATE
 
-  digitalWrite(trigPin1, LOW);
-  delayMicroseconds(2);
-  digitalWrite(trigPin1, HIGH);
-  delayMicroseconds(10);
-  digitalWrite(trigPin1, LOW);
-  duration1 = pulseIn(echoPin1, HIGH);
-  distance1 = jarakSensorKeTanah - ((duration1 / 2) / 29.1);
-  tft.fillRect(0, 129, 160, 41, WarnaBgGrfKiri);
-  tft.setFont(&FreeSansBold24pt7b);
-  tft.setCursor(10, 166);
-  tft.print(distance1);
-  tft.print("cm");
-  H1.Filter(distance1);
+  measure();
 
   for (int i = 13; i > 1; i--) //LOOP NGOPY NILAI SEBELUMNYA
   {
     gIn[i] = gIn[i - 1];
   }
-  /* gIn[1] = rand() % 200 + 1; */
-  gIn[1] = H1.Current(); //MASUKAN HAIL FILTER NILAI PERTAMA
-
+  gIn[1] = H1.Current();       //MASUKAN HAIL FILTER NILAI PERTAMA
   for (int i = 1; i < 14; i++) //BIKIN GRAFIK
   {
     if (gIn[i] >= nilaiMaxGrafik)
@@ -151,25 +160,10 @@ void logging(void)
     }
   }
 
-  digitalWrite(trigPin2, LOW);
-  delayMicroseconds(2);
-  digitalWrite(trigPin2, HIGH);
-  delayMicroseconds(10);
-  digitalWrite(trigPin2, LOW);
-  duration2 = pulseIn(echoPin2, HIGH);
-  distance2 = jarakSensorKeTanah - ((duration2 / 2) / 29.1);
-  tft.fillRect(160, 129, 320, 41, WarnaBgGrfKanan);
-  tft.setCursor(170, 166);
-  tft.print(distance2);
-  tft.print("cm");
-  H2.Filter(distance2);
-
   for (int i = 13; i > 1; i--) //LOOP NGOPY NILAI SEBELUMNYA
   {
     gOu[i] = gOu[i - 1];
   }
-
-  /* gOu[1] = rand() % 200 + 1; */
   gOu[1] = H2.Current(); //MASUKAN HASIL FILTER NILAI PERTAMA
 
   for (int i = 1; i < 14; i++) //BIKIN GRAFIK
@@ -204,20 +198,37 @@ void logging(void)
   duration3 = pulseIn(echoPin3, HIGH);
   distance3 = (duration3 / 3) / 29.1;
 
-  if (distance1 > distance2) //ATUR PINTU AIR DENGAN 2 RELAY
+  float in = H1.Current();
+  float out = H2.Current();
+  if (in > out && in <= maxAir && in >= minAir) //ATUR PINTU AIR DENGAN 2 RELAY
   {
-    digitalWrite(relayUp, LOW);
-    digitalWrite(relayDn, HIGH);
+    buka();
   }
-  else
+  else if (in > out && in < maxAir && in < minAir)
   {
-    digitalWrite(relayUp, HIGH);
-    digitalWrite(relayDn, LOW);
+    buka();
+  }
+  else if (in > out && in > maxAir && in > minAir)
+  {
+    buka();
+  }
+  else if (in < out && in > maxAir && in > minAir)
+  {
+    tutup();
+  }
+  else if (in < out && in < maxAir && in < minAir)
+  {
+    buka();
+  }
+  else if (in < out && in <= maxAir && in >= minAir)
+  {
+    tutup();
   }
 
   //PRINT STATUS PINTU KE LCD
   tft.fillRect(205, 205, 220, 50, Black);
   tft.setFont(&FreeSans9pt7b);
+
   if (distance3 >= gateClosed)
   {
     tft.setCursor(210, 226);
@@ -258,7 +269,7 @@ void logging(void)
     f.print(",");
     f.println();
     f.close(); // close the file
-    buuuzzz();    //BUZZ KALO OKE
+    buuuzzz(); //BUZZ KALO OKE
     Serial.println("sd tulis berhasil");
     tft.fillRect(0, 0, 20, 20, Green);
   }
@@ -350,14 +361,19 @@ void setup()
   //base graph
   tft.fillRect(15, 62, 130, 63, WarnaBgGrfKiri);
   tft.fillRect(175, 62, 130, 63, WarnaBgGrfKanan);
+
+  for (size_t i = 0; i < filterVal; i++)
+  {
+    measure();
+    delay(1000);
+  }
+
   logging(); //LOGGING AWAL SETUP
 }
 
-void loop()
+//FUNGSI BUAT NGUKUR
+void measure()
 {
-  Serial.println(" . ");
-
-  //NGUKUR UNTUK MASUKIN KE FILTER DAN CETAK LCD PER DETIK
   long duration1, distance1, duration2, distance2;
   digitalWrite(trigPin1, LOW);
   delayMicroseconds(2);
@@ -384,6 +400,14 @@ void loop()
   tft.print(distance2);
   tft.print("cm");
   H2.Filter(distance2);
+}
+
+void loop()
+{
+  Serial.println(" . ");
+
+  //NGUKUR UNTUK MASUKIN KE FILTER DAN CETAK LCD PER DETIK
+  measure();
   //-----------------------------------------------------------------
 
   //PRINT WAKTU PER DETIK
