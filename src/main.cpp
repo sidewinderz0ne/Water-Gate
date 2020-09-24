@@ -9,12 +9,12 @@ int buzzerSound = 2345;       //KHz
 long alarm;
 //--------------------------------------------------
 //SETTING SENSOR
-int jarakSensorKeTanah = 240;
-int gateClosed = 200;
-int gateOpened = 50;
-int nilaiMaxGrafik = 200;
-int maxAir = -40;
-int minAir = -60;
+int jarakSensorKeTanah = 70;
+int gateClosed = 50;
+int gateOpened = 20;
+int nilaiMaxGrafik = 50;
+int maxAir = 10;
+int minAir = 40;
 int filterVal = 20;
 //--------------------------------------------------
 //SETTING PIN
@@ -126,6 +126,7 @@ void tutup()
 //FUNGSI LOGGING DATA
 void logging(void)
 {
+  tone(buzzer, buzzerSound);
   alarm = alarm + alarmTime; //KALIBERASI WAKTU
   long duration3, distance3; //VARIABLE SENSOR PINTU WATER GATE
 
@@ -206,7 +207,7 @@ void logging(void)
   }
   else if (in > out && in < maxAir && in < minAir)
   {
-    buka();
+    tutup();
   }
   else if (in > out && in > maxAir && in > minAir)
   {
@@ -272,6 +273,7 @@ void logging(void)
     buuuzzz(); //BUZZ KALO OKE
     Serial.println("sd tulis berhasil");
     tft.fillRect(0, 0, 20, 20, Green);
+      noTone(buzzer);
   }
   else
   {
