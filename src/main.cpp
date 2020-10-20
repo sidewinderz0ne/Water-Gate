@@ -1,33 +1,40 @@
 #include <Arduino.h>
-
 //--------------SETTINGAN ALAT
 //--------------------------------------------------
 //SETTING WAKTU
-const long alarmTime = 10000; //Setting waktu logging
-int buzzerDuration = 1001;    //Mili Detik
-int buzzerSound = 2345;       //KHz
+int logTime = 20;
+long alarmTime = logTime * 1000; //Setting waktu logging
+int buzzerDuration = 1001;       //Mili Detik
+int buzzerSound = 2345;          //KHz
 long alarm;
 //--------------------------------------------------
 //SETTING SENSOR
 int jarakSensorKeTanah = 70;
+int jarakBlokKeTanah = 32;
 int gateClosed = 50;
 int gateOpened = 20;
-int nilaiMaxGrafik = 50;
-int maxAir = 10;
-int minAir = 40;
-int filterVal = 20;
+int nilaiMaxGrafikS = (-37);
+int nilaiMinGrafikS = 32;
+int maxAirS = 10;
+int minAirS = 20;
+int filterVal = 10;
+//--------------------------------------------------
+int maxAir = jarakBlokKeTanah - maxAirS;
+int minAir = jarakBlokKeTanah - minAirS;
+int nilaiMaxGrafik = (jarakBlokKeTanah - nilaiMaxGrafikS);
+int nilaiMinGrafik = (jarakBlokKeTanah - nilaiMinGrafikS);
 //--------------------------------------------------
 //SETTING PIN
-#define buzzer 30
+#define buzzer 31
 //sensor air 1
-#define trigPin1 22
-#define echoPin1 23
+#define trigPin1 23
+#define echoPin1 22
 //sensor air 2
-#define trigPin2 24
-#define echoPin2 25
+#define trigPin2 27
+#define echoPin2 26
 //sensor pintu
-#define trigPin3 26
-#define echoPin3 27
+#define trigPin3 24
+#define echoPin3 25
 //relay kontrol pintu
 #define relayUp 28
 #define relayDn 29
@@ -136,8 +143,8 @@ void logging(void)
   {
     gIn[i] = gIn[i - 1];
   }
-  gIn[1] = H1.Current();       //MASUKAN HAIL FILTER NILAI PERTAMA
-  for (int i = 1; i < 14; i++) //BIKIN GRAFIK
+  gIn[1] = jarakBlokKeTanah - H1.Current(); //MASUKAN HAIL FILTER NILAI PERTAMA
+  for (int i = 1; i < 14; i++)              //BIKIN GRAFIK
   {
     if (gIn[i] >= nilaiMaxGrafik)
     {
@@ -149,9 +156,8 @@ void logging(void)
     }
     else
     {
-      int a = 60 * (gIn[i] - nilaiMaxGrafik) / (nilaiMaxGrafik * -1);
+      int a = nilaiMaxGrafik - gIn[i];
       gFI[i] = 62 + a;
-      //GANTI RUMUS
     }
     tft.fillRect(10 + (10 * i), 62, 10, 68, WarnaBgGrfKiri);
     tft.fillRect(10 + (10 * i), gFI[i], 3, 3, Yellow);
@@ -165,7 +171,7 @@ void logging(void)
   {
     gOu[i] = gOu[i - 1];
   }
-  gOu[1] = H2.Current(); //MASUKAN HASIL FILTER NILAI PERTAMA
+  gOu[1] = jarakBlokKeTanah - H2.Current(); //MASUKAN HASIL FILTER NILAI PERTAMA
 
   for (int i = 1; i < 14; i++) //BIKIN GRAFIK
   {
@@ -179,7 +185,7 @@ void logging(void)
     }
     else
     {
-      int a = 60 * (gOu[i] - nilaiMaxGrafik) / (nilaiMaxGrafik * -1);
+      int a = nilaiMaxGrafik - gOu[i];
       gFO[i] = 62 + a;
       //GANTI RUMUS
     }
@@ -199,11 +205,11 @@ void logging(void)
   duration3 = pulseIn(echoPin3, HIGH);
   distance3 = (duration3 / 3) / 29.1;
 
-  float in = H1.Current();
-  float out = H2.Current();
-  if (in > out && in <= maxAir && in >= minAir) //ATUR PINTU AIR DENGAN 2 RELAY
+  float in = jarakBlokKeTanah - H1.Current();
+  float out = jarakBlokKeTanah - H2.Current();
+  if (in > out && in < maxAir && in > minAir) //ATUR PINTU AIR DENGAN 2 RELAY
   {
-    buka();
+    tutup();
   }
   else if (in > out && in < maxAir && in < minAir)
   {
@@ -221,7 +227,7 @@ void logging(void)
   {
     buka();
   }
-  else if (in < out && in <= maxAir && in >= minAir)
+  else if (in < out && in < maxAir && in > minAir)
   {
     tutup();
   }
@@ -273,7 +279,7 @@ void logging(void)
     buuuzzz(); //BUZZ KALO OKE
     Serial.println("sd tulis berhasil");
     tft.fillRect(0, 0, 20, 20, Green);
-      noTone(buzzer);
+    noTone(buzzer);
   }
   else
   {
@@ -305,6 +311,7 @@ void setup()
     Serial.println("RTC lost power, let's set the time!");
     rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
   }
+  //rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
 
   //SET INPUT OUTPUT PIN
   pinMode(trigPin1, OUTPUT);
@@ -320,14 +327,15 @@ void setup()
   Serial.print("Show BMP files on TFT with ID:0x");
   ID = tft.readID();
   Serial.println(ID, HEX);
-  if (ID == 0x0D3D3)
-    ID = 0x9481;
-  tft.begin(ID);
+  if (ID == 0xD3D3)
+    ID = 0x9481; // write-only shield
+  ID = 0x9329;   // force ID
+  tft.begin(0x9486);
   tft.setRotation(1);
 
   //SETTING AWAL SD CARD
-  bool good = SD.begin(SD_CS);
-  if (!good)
+  bool sd = SD.begin(SD_CS);
+  if (!sd)
   {
     Serial.print(F("cannot start SD"));
     while (1)
@@ -337,6 +345,74 @@ void setup()
   {
     Serial.println(F("SD is OK!"));
   }
+  File fh = SD.open("settings.txt", FILE_READ);
+  char charBuffer[32];
+
+  if (!fh)
+  {
+    Serial.println("SD open fail");
+    return;
+  }
+
+  int chPos = 0;
+  int lineNo = 0;
+
+  while (fh.available())
+  {
+    char ch = fh.read();
+    if (ch == '\r')
+    {
+      chPos = 0;
+
+      switch (lineNo)
+      {
+      case 0:
+        sscanf(charBuffer, "logTime:%u", &logTime);
+        break;
+      case 1:
+        sscanf(charBuffer, "jarakSensorKeTanah:%u", &jarakSensorKeTanah);
+        break;
+      case 2:
+        sscanf(charBuffer, "jarakBlokKeTanah:%u", &jarakBlokKeTanah);
+        break;
+      case 3:
+        sscanf(charBuffer, "gateClosed:%u", &gateClosed);
+        break;
+      case 4:
+        sscanf(charBuffer, "gateOpened:%u", &gateOpened);
+        break;
+      case 5:
+        sscanf(charBuffer, "nilaiMaxGrafikS:%u", &nilaiMaxGrafikS);
+        break;
+      case 6:
+        sscanf(charBuffer, "nilaiMinGrafikS:%u", &nilaiMinGrafikS);
+        break;
+      case 7:
+        sscanf(charBuffer, "maxAirS:%u", &maxAirS);
+        break;
+      case 8:
+        sscanf(charBuffer, "minAirS:%u", &minAirS);
+        break;
+      case 9:
+        sscanf(charBuffer, "filterVal:%u", &filterVal);
+        break;
+      }
+      //Serial.println(charBuffer);
+      lineNo++;
+    }
+    else if (ch == '\n')
+    {
+      // do nothing
+    }
+    else if (chPos < 31)
+    {
+      charBuffer[chPos] = ch;
+      chPos++;
+      charBuffer[chPos] = 0;
+    }
+  }
+
+  fh.close();
   root = SD.open(namebuf);
   pathlen = strlen(namebuf);
   tft.fillRect(0, 0, 320, 240, Black);
@@ -383,7 +459,7 @@ void measure()
   delayMicroseconds(10);
   digitalWrite(trigPin1, LOW);
   duration1 = pulseIn(echoPin1, HIGH);
-  distance1 = jarakSensorKeTanah - ((duration1 / 2) / 29.1);
+  distance1 = ((duration1 / 2) / 29.1) - (jarakSensorKeTanah - jarakBlokKeTanah);
   tft.fillRect(0, 129, 160, 41, 0x0164);
   tft.setFont(&FreeSansBold24pt7b);
   tft.setCursor(10, 166);
@@ -396,7 +472,7 @@ void measure()
   delayMicroseconds(10);
   digitalWrite(trigPin2, LOW);
   duration2 = pulseIn(echoPin2, HIGH);
-  distance2 = jarakSensorKeTanah - ((duration2 / 2) / 29.1);
+  distance2 = ((duration2 / 2) / 29.1) - (jarakSensorKeTanah - jarakBlokKeTanah);
   tft.fillRect(160, 129, 320, 41, 0x002E);
   tft.setCursor(170, 166);
   tft.print(distance2);
@@ -407,11 +483,9 @@ void measure()
 void loop()
 {
   Serial.println(" . ");
-
   //NGUKUR UNTUK MASUKIN KE FILTER DAN CETAK LCD PER DETIK
   measure();
   //-----------------------------------------------------------------
-
   //PRINT WAKTU PER DETIK
   DateTime now = rtc.now();
   tft.fillRect(140, 186, 220, 25, 0x0000);
@@ -611,7 +685,7 @@ uint8_t showBMP(char *nm, int x, int y)
       }                                                         // end cols
     }                                                           // end rows
     tft.setAddrWindow(0, 0, tft.width() - 1, tft.height() - 1); //restore full screen
-    ret = 0;                                                    // good render
+    ret = 0;                                                    // sd render
   }
   bmpFile.close();
   return (ret);
