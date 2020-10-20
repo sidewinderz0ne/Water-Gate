@@ -18,6 +18,8 @@ int nilaiMinGrafikS = 32;
 int maxAirS = 10;
 int minAirS = 20;
 int filterVal = 10;
+int calIn = 0;
+int calOut = 0;
 //--------------------------------------------------
 int maxAir = jarakBlokKeTanah - maxAirS;
 int minAir = jarakBlokKeTanah - minAirS;
@@ -44,6 +46,8 @@ int nilaiMinGrafik = (jarakBlokKeTanah - nilaiMinGrafikS);
 
 #include <Filter.h>
 ExponentialFilter<float> H1(filterVal, 0), H2(filterVal, 0);
+
+//variabel bikin grafik
 int gIn[13] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 int gOu[13] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 int gFI[13] = {62, 62, 62, 62, 62, 62, 62, 62, 62, 62, 62, 62, 62};
@@ -58,6 +62,7 @@ char daysOfTheWeek[7][12] = {"Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Juma
 #include <SdFat.h>           // Use the SdFat library
 SdFatSoftSpi<12, 11, 13> SD; //Bit-Bang on the Shield pins
 #define SD_CS 10
+
 #include <Adafruit_GFX.h> // Hardware-specific library
 #include <MCUFRIEND_kbv.h>
 MCUFRIEND_kbv tft;
@@ -268,9 +273,9 @@ void logging(void)
     f.print(":");
     f.print(rtc.now().second(), DEC);
     f.print(",");
-    f.print(H1.Current());
+    f.print(in);
     f.print(",");
-    f.print(H2.Current());
+    f.print(out);
     f.print(",");
     f.print(distance3);
     f.print(",");
@@ -324,7 +329,6 @@ void setup()
   pinMode(relayDn, OUTPUT);
 
   //SETTING AWAL LCD
-  Serial.print("Show BMP files on TFT with ID:0x");
   ID = tft.readID();
   Serial.println(ID, HEX);
   if (ID == 0xD3D3)
@@ -396,6 +400,12 @@ void setup()
       case 9:
         sscanf(charBuffer, "filterVal:%u", &filterVal);
         break;
+      case 10:
+        sscanf(charBuffer, "calIn:%u", &calIn);
+        break;
+      case 11:
+        sscanf(charBuffer, "calOut:%u", &calOut);
+        break;
       }
       //Serial.println(charBuffer);
       lineNo++;
@@ -459,7 +469,7 @@ void measure()
   delayMicroseconds(10);
   digitalWrite(trigPin1, LOW);
   duration1 = pulseIn(echoPin1, HIGH);
-  distance1 = ((duration1 / 2) / 29.1) - (jarakSensorKeTanah - jarakBlokKeTanah);
+  distance1 = ((duration1 / 2) / 29.1) - (jarakSensorKeTanah - jarakBlokKeTanah) + calIn;
   tft.fillRect(0, 129, 160, 41, 0x0164);
   tft.setFont(&FreeSansBold24pt7b);
   tft.setCursor(10, 166);
@@ -472,7 +482,7 @@ void measure()
   delayMicroseconds(10);
   digitalWrite(trigPin2, LOW);
   duration2 = pulseIn(echoPin2, HIGH);
-  distance2 = ((duration2 / 2) / 29.1) - (jarakSensorKeTanah - jarakBlokKeTanah);
+  distance2 = ((duration2 / 2) / 29.1) - (jarakSensorKeTanah - jarakBlokKeTanah) + calOut;
   tft.fillRect(160, 129, 320, 41, 0x002E);
   tft.setCursor(170, 166);
   tft.print(distance2);
